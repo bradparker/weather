@@ -21,7 +21,8 @@ executable weather
     aeson,
     lens-aeson,
     text,
-    scientific
+    scientific,
+    vty
   hs-source-dirs:
     src
   default-language:

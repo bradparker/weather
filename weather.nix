@@ -1,5 +1,5 @@
 { mkDerivation, aeson, base, brick, bytestring, lens, lens-aeson
-, scientific, stdenv, text, wreq
+, scientific, stdenv, text, vty, wreq
 }:
 mkDerivation {
   pname = "weather";
@@ -8,7 +8,8 @@ mkDerivation {
   isLibrary = false;
   isExecutable = true;
   executableHaskellDepends = [
-    aeson base brick bytestring lens lens-aeson scientific text wreq
+    aeson base brick bytestring lens lens-aeson scientific text vty
+    wreq
   ];
   description = "Command line weather app";
   license = stdenv.lib.licenses.bsd3;

@@ -2,18 +2,24 @@ module Main
   ( main
   ) where
 
-import           Brick                      (Widget, simpleMain, str,
-                                             withBorderStyle, (<+>))
+import           Brick                      (App (..), BrickEvent (..), EventM,
+                                             Next, Widget, attrMap, continue,
+                                             customMain, halt, neverShowCursor,
+                                             str, withBorderStyle, (<+>))
+import           Brick.BChan                (newBChan, writeBChan)
 import           Brick.Widgets.Border       (borderWithLabel, vBorder)
-import           Brick.Widgets.Border.Style (unicode)
+import           Brick.Widgets.Border.Style (ascii)
 import           Brick.Widgets.Center       (center)
+import           Control.Concurrent         (forkIO, threadDelay)
 import           Control.Lens               (preview, view)
+import           Control.Monad              (forever, void)
 import           Data.Aeson.Lens            (AsValue, key, _Number, _String)
 import           Data.ByteString.Lazy       (ByteString)
 import           Data.Maybe                 (fromMaybe)
 import           Data.Monoid                ((<>))
 import           Data.Scientific            (Scientific)
 import           Data.Text                  (Text, unpack)
+import qualified Graphics.Vty               as V
 import           Network.Wreq               (Response, get, responseBody)
 import           System.Environment         (getEnv)
 
@@ -44,11 +50,33 @@ getForecast apiKey latLng =
 title :: String -> Widget ()
 title latLng = str ("Weather at " <> latLng)
 
-ui :: Forecast -> Widget ()
-ui (Forecast latLng temp summary) =
-  withBorderStyle unicode $
+drawUI :: Forecast -> [Widget Name]
+drawUI (Forecast latLng temp summary) =
+  pure $
+  withBorderStyle ascii $
   borderWithLabel (title latLng) $
   center (str summary) <+> vBorder <+> center (str (show temp <> "°C"))
+
+type Name = ()
+
+newtype Event =
+  ReceiveForecastSuccess Forecast
+
+handleEvent :: Forecast -> BrickEvent Name Event -> EventM Name (Next Forecast)
+handleEvent _ (AppEvent (ReceiveForecastSuccess next))     = continue next
+handleEvent previous (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt previous
+handleEvent previous (VtyEvent (V.EvKey V.KEsc []))        = halt previous
+handleEvent previous _                                     = continue previous
+
+app :: App Forecast Event Name
+app =
+  App
+  { appDraw = drawUI
+  , appChooseCursor = neverShowCursor
+  , appHandleEvent = handleEvent
+  , appStartEvent = return
+  , appAttrMap = const (attrMap V.defAttr [])
+  }
 
 data Forecast =
   Forecast String
@@ -63,5 +91,12 @@ extractForecast latLng =
 main :: IO ()
 main = do
   apiKey <- getEnv "DARK_SKY_API_KEY"
-  forecast <- extractForecast work <$> getForecast apiKey work
-  simpleMain (ui forecast)
+  chan <- newBChan 10
+  void
+    (forkIO
+       (forever
+          ((writeBChan chan =<<
+            ReceiveForecastSuccess . extractForecast work <$>
+            getForecast apiKey work) >>
+           threadDelay 30000000)))
+  void (customMain (V.mkVty V.defaultConfig) (Just chan) app (Forecast "" 0 ""))
