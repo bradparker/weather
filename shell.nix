@@ -1,4 +1,8 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "default" }:
+with import <nixpkgs> {};
+{ nixpkgs ? import (fetchgit {
+    inherit (builtins.fromJSON (builtins.readFile ./nixpkgs.json)) url rev sha256;
+  }) {},
+  compiler ? "default" }:
 let
   direnv = nixpkgs.direnv;
 
