@@ -1,5 +1,7 @@
 # Silly commandline weather app
 
+![Screenshot](screenshot.png)
+
 Just to play around with Haskell and the Brick commandline app lib.
 
 ## Development
